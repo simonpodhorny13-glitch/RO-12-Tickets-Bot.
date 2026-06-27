@@ -133,7 +133,32 @@ client.on("messageCreate", async (message) => {
     user.balance -= price; data.seatMap[seat] = message.author.id; user.seat = seat; saveData();
     return message.reply(`💺 Seat booked: ${seat} for $${price}.`);
   }
+if (content === "!map cabins") {
+    const isTaken = (id) => data.cabinMap[id] ? "[X]" : "[ ]";
+    
+    const mapMsg = `
+🛏️ **CABINS**
 
+**ECONOMY**
+1A ${isTaken("1A")}
+1B ${isTaken("1B")}
+2A ${isTaken("2A")}
+2B ${isTaken("2B")}
+
+**FIRST**
+1C ${isTaken("1C")}
+1D ${isTaken("1D")}
+2C ${isTaken("2C")}
+2D ${isTaken("2D")}
+
+**DOUBLE**
+3A ${isTaken("3A")}
+3B ${isTaken("3B")}
+3C ${isTaken("3C")}
+3D ${isTaken("3D")}`;
+
+    return message.channel.send(mapMsg);
+}
   if (content === "!cancel") {
     if (!user.seat) return message.reply("❌ Nothing to cancel.");
     delete data.seatMap[user.seat]; user.seat = null; user.balance += 40; saveData();
