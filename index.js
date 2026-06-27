@@ -1,17 +1,3 @@
-const express = require('express');
-const app = express();
-const PORT = process.env.PORT || 3000; // Render si nastaví svůj port, nebo použije 3000
-
-app.get("/", (req, res) => {
-  res.send("Bot je online a vše funguje!");
-});
-
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Web server běží na portu ${PORT}`);
-});
-
-// Rest of code:
-client.login(process.env.TOKEN);
 const { Client, GatewayIntentBits } = require("discord.js");
 const fs = require("fs");
 const express = require("express");
@@ -24,13 +10,11 @@ app.get("/", (req, res) => {
   res.send("RO-12 bot is alive");
 });
 
-// OPRAVA: Přidáno "0.0.0.0", aby Render správně detekoval otevřený port
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Web server running on port ${PORT}`);
 });
 
 // ---------------- BOT SETUP ----------------
-
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -42,7 +26,6 @@ const client = new Client({
 const TOKEN = process.env.TOKEN;
 
 // ---------------- DATA ----------------
-
 function loadData() {
   try {
     return JSON.parse(fs.readFileSync("data.json", "utf8"));
@@ -62,7 +45,6 @@ function saveData() {
 let data = loadData();
 
 // ---------------- VOYAGE STATE ----------------
-
 let activeVoyage = null;
 let voyageId = 1;
 
@@ -70,7 +52,6 @@ const FIVE_DAYS = 5 * 24 * 60 * 60 * 1000;
 const ONE_DAY = 24 * 60 * 60 * 1000;
 
 // ---------------- CABINS ----------------
-
 const CABINS = {
   economy: ["1A", "1B", "2A", "2B"],
   first: ["1C", "1D", "2C", "2D"],
@@ -78,7 +59,6 @@ const CABINS = {
 };
 
 // ---------------- HELPERS ----------------
-
 function getUser(id) {
   if (!data.users[id]) {
     data.users[id] = {
@@ -97,13 +77,11 @@ function isValidSeat(seat) {
 }
 
 // ---------------- READY ----------------
-
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
 // ---------------- COMMANDS ----------------
-
 client.on("messageCreate", (message) => {
   if (message.author.bot) return;
 
@@ -122,18 +100,10 @@ client.on("messageCreate", (message) => {
   // ---------------- SEAT ----------------
   if (content.startsWith("!seat")) {
     const seat = content.split(" ")[1];
-
-    if (!isValidSeat(seat)) {
-      return message.reply("❌ Invalid seat (1A–20F)");
-    }
-
-    if (data.seatMap[seat]) {
-      return message.reply("❌ Seat already taken.");
-    }
-
+    if (!isValidSeat(seat)) return message.reply("❌ Invalid seat (1A–20F)");
+    if (data.seatMap[seat]) return message.reply("❌ Seat already taken.");
     data.seatMap[seat] = message.author.id;
     user.seat = seat;
-
     saveData();
     return message.reply(`💺 Seat booked: ${seat}`);
   }
@@ -142,18 +112,10 @@ client.on("messageCreate", (message) => {
   if (content.startsWith("!cabin")) {
     const cabin = content.split(" ")[1];
     const type = content.split(" ")[2];
-
-    if (!CABINS[type]?.includes(cabin)) {
-      return message.reply("❌ Invalid cabin.");
-    }
-
-    if (data.cabinMap[cabin]) {
-      return message.reply("❌ Cabin already taken.");
-    }
-
+    if (!CABINS[type]?.includes(cabin)) return message.reply("❌ Invalid cabin.");
+    if (data.cabinMap[cabin]) return message.reply("❌ Cabin already taken.");
     data.cabinMap[cabin] = message.author.id;
     user.cabin = cabin;
-
     saveData();
     return message.reply(`🛏️ Cabin booked: ${cabin}`);
   }
@@ -161,42 +123,33 @@ client.on("messageCreate", (message) => {
   // ---------------- MAP SEATS ----------------
   if (content === "!map seats") {
     let out = "🛳️ RO-12 SEAT MAP\n\n";
-
     for (let r = 1; r <= 20; r++) {
       let row = `${String(r).padStart(2, "0")} `;
-
       for (const l of ["A", "B", "C", "D", "E", "F"]) {
         const seat = `${r}${l}`;
         row += data.seatMap[seat] ? "[X]" : "[ ]";
       }
-
       out += row + "\n";
     }
-
     return message.reply(out);
   }
 
   // ---------------- MAP CABINS ----------------
   if (content.startsWith("!map cabins")) {
     let out = "🛏️ CABINS\n\n";
-
     for (const type in CABINS) {
       out += `\n${type.toUpperCase()}\n`;
-
       for (const cabin of CABINS[type]) {
         out += `${cabin} ${data.cabinMap[cabin] ? "[X]" : "[ ]"}\n`;
       }
     }
-
     return message.reply(out);
   }
 
   // ---------------- SET VOYAGE ----------------
   if (content.startsWith("!setvoyage")) {
     if (channel !== "staff") return;
-
     const [, from, to, length] = content.split(" ");
-
     activeVoyage = {
       id: voyageId++,
       from,
@@ -209,30 +162,21 @@ client.on("messageCreate", (message) => {
       departure: Date.now() + FIVE_DAYS,
       salesOpen: false
     };
-
-    return message.channel.send(
-      `🚢 VOYAGE CREATED\n\n` +
-      `${from} → ${to}\n` +
-      `Length: ${length}\n\n` +
-      `Crew: Captain + First Officer (+ optional GC)`
-    );
+    return message.channel.send(`🚢 VOYAGE CREATED\n\n${from} → ${to}\nLength: ${length}\n\nCrew: Captain + First Officer (+ optional GC)`);
   }
 
   // ---------------- CLAIMS ----------------
   if (!activeVoyage) return;
-
   if (content === "!claim captain") {
     if (activeVoyage.captain) return message.reply("Taken");
     activeVoyage.captain = message.author.username;
     return message.reply("Captain claimed");
   }
-
   if (content === "!claim fo") {
     if (activeVoyage.fo) return message.reply("Taken");
     activeVoyage.fo = message.author.username;
     return message.reply("First Officer claimed");
   }
-
   if (content === "!claim gc") {
     if (activeVoyage.gc) return message.reply("Taken");
     activeVoyage.gc = message.author.username;
@@ -241,32 +185,18 @@ client.on("messageCreate", (message) => {
 });
 
 // ---------------- VOYAGE CHECKER ----------------
-
 setInterval(() => {
   if (!activeVoyage) return;
-
   const now = Date.now();
-
-  if (!activeVoyage.gc && now > activeVoyage.gcDeadline) {
-    activeVoyage.gc = "Unassigned";
-  }
-
+  if (!activeVoyage.gc && now > activeVoyage.gcDeadline) activeVoyage.gc = "Unassigned";
   if (activeVoyage.captain && activeVoyage.fo && !activeVoyage.salesOpen) {
     activeVoyage.salesOpen = true;
-
     const channel = client.channels.cache.find(c => c.name === "voyages");
     if (channel) {
-      channel.send(
-        `🚢 VOYAGE CONFIRMED\n\n` +
-        `Route: ${activeVoyage.from} → ${activeVoyage.to}\n` +
-        `Captain: ${activeVoyage.captain}\n` +
-        `First Officer: ${activeVoyage.fo}\n` +
-        `Ground Crew: ${activeVoyage.gc || "None"}`
-      );
+      channel.send(`🚢 VOYAGE CONFIRMED\n\nRoute: ${activeVoyage.from} → ${activeVoyage.to}\nCaptain: ${activeVoyage.captain}\nFirst Officer: ${activeVoyage.fo}\nGround Crew: ${activeVoyage.gc || "None"}`);
     }
   }
 }, 60000);
 
 // ---------------- LOGIN ----------------
-
 client.login(TOKEN);
