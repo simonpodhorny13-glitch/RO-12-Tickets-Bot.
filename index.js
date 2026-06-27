@@ -80,16 +80,13 @@ client.on("messageCreate", async (message) => {
     const mapMsg = `🛏️ **CABINS**\n\n**ECONOMY**\n1A ${isTaken("1A")}\n1B ${isTaken("1B")}\n2A ${isTaken("2A")}\n2B ${isTaken("2B")}\n\n**FIRST**\n1C ${isTaken("1C")}\n1D ${isTaken("1D")}\n2C ${isTaken("2C")}\n2D ${isTaken("2D")}\n\n**DOUBLE**\n3A ${isTaken("3A")}\n3B ${isTaken("3B")}\n3C ${isTaken("3C")}\n3D ${isTaken("3D")}`;
     return message.channel.send(mapMsg);
   }
-// Opravený !bookcabin s ohledem na multiplikátor trasy
+
   if (content.startsWith("!bookcabin")) {
-    if (!activeVoyage) return message.reply("❌ No active voyage."); // Kontrola, zda existuje trasa
-    
+    if (!activeVoyage) return message.reply("❌ No active voyage.");
     const cabin = content.split(" ")[1];
     if (!cabin) return message.reply("❌ Use: !bookcabin 1A");
     if (data.cabinMap[cabin]) return message.reply("❌ This cabin is taken.");
     
-    // Výpočet ceny: Base 50 * multiplikátor trasy (Short 1, Medium 1.5, Long 2)
-    // Pokud je to First Class, vynásobíme to celé ještě 3x
     const basePrice = 50 * activeVoyage.multiplier;
     const isFirstClass = ["1C", "1D", "2C", "2D"].includes(cabin);
     const price = isFirstClass ? (basePrice * 3) : basePrice;
@@ -100,9 +97,7 @@ client.on("messageCreate", async (message) => {
     data.cabinMap[cabin] = message.author.id; 
     user.cabin = cabin; 
     saveData();
-    
     return message.reply(`🛏️ Cabin ${cabin} booked for $${price}!`);
-  }
   }
 
   if (content.startsWith("!cancelvoyage")) {
@@ -166,7 +161,8 @@ client.on("messageCreate", async (message) => {
         delete data.seatMap[user.seat]; user.seat = null; 
     }
     if (user.cabin) { 
-        const price = ["1C", "1D", "2C", "2D"].includes(user.cabin) ? 150 : 50;
+        const basePrice = 50 * activeVoyage.multiplier;
+        const price = ["1C", "1D", "2C", "2D"].includes(user.cabin) ? (basePrice * 3) : basePrice;
         refund += Math.floor(price * 0.9);
         delete data.cabinMap[user.cabin]; user.cabin = null; 
     }
