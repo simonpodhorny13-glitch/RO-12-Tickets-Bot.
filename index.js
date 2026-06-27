@@ -10,7 +10,8 @@ app.get("/", (req, res) => {
   res.send("RO-12 bot is alive");
 });
 
-app.listen(PORT, () => {
+// OPRAVA: Přidáno "0.0.0.0", aby Render správně detekoval otevřený port
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Web server running on port ${PORT}`);
 });
 
