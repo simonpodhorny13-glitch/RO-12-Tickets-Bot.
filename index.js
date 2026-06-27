@@ -5,212 +5,143 @@ const express = require("express");
 // ---------------- WEB SERVER (RENDER FIX) ----------------
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-app.get("/", (req, res) => {
-  res.send("RO-12 bot is alive");
-});
-
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Web server running on port ${PORT}`);
-});
+app.get("/", (req, res) => res.send("RO-12 bot is alive"));
+app.listen(PORT, "0.0.0.0", () => console.log(`Web server running on port ${PORT}`));
 
 // ---------------- BOT SETUP ----------------
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
 
 const TOKEN = process.env.TOKEN;
+let data = loadData();
 
-// ---------------- DATA ----------------
 function loadData() {
   try {
-    if (!fs.existsSync("data.json")) {
-      return { users: {}, seatMap: {}, cabinMap: {} };
-    }
+    if (!fs.existsSync("data.json")) return { users: {}, seatMap: {}, cabinMap: {} };
     const raw = fs.readFileSync("data.json", "utf8");
     const parsed = JSON.parse(raw);
-    return {
-      users: parsed.users || {},
-      seatMap: parsed.seatMap || {},
-      cabinMap: parsed.cabinMap || {}
-    };
-  } catch (e) {
-    console.error("Error loading data, initializing empty structure:", e);
-    return { users: {}, seatMap: {}, cabinMap: {} };
-  }
+    return { users: parsed.users || {}, seatMap: parsed.seatMap || {}, cabinMap: parsed.cabinMap || {} };
+  } catch (e) { return { users: {}, seatMap: {}, cabinMap: {} }; }
 }
 
 function saveData() {
-  try {
-    fs.writeFileSync("data.json", JSON.stringify(data, null, 2));
-  } catch (e) {
-    console.error("Error saving data:", e);
-  }
+  try { fs.writeFileSync("data.json", JSON.stringify(data, null, 2)); } catch (e) { console.error("Save error:", e); }
 }
-
-let data = loadData();
 
 // ---------------- VOYAGE STATE ----------------
 let activeVoyage = null;
 let voyageId = 1;
-
-const FIVE_DAYS = 5 * 24 * 60 * 60 * 1000;
 const ONE_DAY = 24 * 60 * 60 * 1000;
+const FIVE_DAYS = 5 * 24 * 60 * 60 * 1000;
+const CABINS = { economy: ["1A", "1B", "2A", "2B"], first: ["1C", "1D", "2C", "2D"], double: ["3A", "3B", "3C", "3D"] };
 
-// ---------------- CABINS ----------------
-const CABINS = {
-  economy: ["1A", "1B", "2A", "2B"],
-  first: ["1C", "1D", "2C", "2D"],
-  double: ["3A", "3B", "3C", "3D"]
-};
-
-// ---------------- HELPERS ----------------
 function getUser(id) {
   if (!data.users[id]) {
-    data.users[id] = {
-      balance: 250,
-      seat: null,
-      cabin: null,
-      lastClaim: Date.now()
-    };
+    data.users[id] = { balance: 250, seat: null, cabin: null };
     saveData();
   }
   return data.users[id];
 }
 
-function isValidSeat(seat) {
-  return /^([1-9]|1[0-9]|20)([A-F])$/.test(seat);
-}
+function isValidSeat(seat) { return /^([1-9]|1[0-9]|20)([A-F])$/.test(seat); }
 
-// ---------------- READY ----------------
-client.once("ready", () => {
-  console.log(`Logged in as ${client.user.tag}`);
-});
+client.once("ready", () => console.log(`Logged in as ${client.user.tag}`));
 
 // ---------------- COMMANDS ----------------
-client.on("messageCreate", (message) => {
+client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
   const channel = message.channel.name;
   const content = message.content;
   const user = getUser(message.author.id);
-
   const allowed = ["bots", "tickets", "staff", "voyages"];
+  
   if (!allowed.includes(channel)) return;
+  if (content.startsWith("!ticket") && channel !== "tickets") return message.reply("❌ Use #tickets channel.");
 
-  // ---------------- BALANCE ----------------
-  if (content === "!balance") {
-    return message.reply(`💵 Balance: $${user.balance}`);
-  }
+  // !balance
+  if (content === "!balance") return message.reply(`💵 Balance: $${user.balance}`);
 
-  // ---------------- SEAT ----------------
+  // !seat (with booking logic)
   if (content.startsWith("!seat")) {
+    if (!activeVoyage || !activeVoyage.salesOpen) return message.reply("❌ Sales not open yet.");
+    if (user.seat) return message.reply(`❌ You already have a seat: ${user.seat}`);
+    
     const seat = content.split(" ")[1];
+    const price = 50;
     if (!isValidSeat(seat)) return message.reply("❌ Invalid seat (1A–20F)");
     if (data.seatMap[seat]) return message.reply("❌ Seat already taken.");
+    if (user.balance < price) return message.reply("❌ Not enough money!");
+    
+    user.balance -= price;
     data.seatMap[seat] = message.author.id;
     user.seat = seat;
     saveData();
-    return message.reply(`💺 Seat booked: ${seat}`);
+    return message.reply(`💺 Seat booked: ${seat}.`);
   }
 
-  // ---------------- CABIN ----------------
+  // !cabin (with booking logic)
   if (content.startsWith("!cabin")) {
-    const cabin = content.split(" ")[1];
-    const type = content.split(" ")[2];
+    if (!activeVoyage || !activeVoyage.salesOpen) return message.reply("❌ Sales not open yet.");
+    if (user.cabin) return message.reply(`❌ You already have a cabin: ${user.cabin}`);
+    
+    const [_, cabin, type] = content.split(" ");
     if (!CABINS[type]?.includes(cabin)) return message.reply("❌ Invalid cabin.");
     if (data.cabinMap[cabin]) return message.reply("❌ Cabin already taken.");
+    
     data.cabinMap[cabin] = message.author.id;
     user.cabin = cabin;
     saveData();
     return message.reply(`🛏️ Cabin booked: ${cabin}`);
   }
 
-  // ---------------- MAP SEATS ----------------
+  // !cancel
+  if (content === "!cancel") {
+    if (!user.seat && !user.cabin) return message.reply("❌ Nothing to cancel.");
+    if (user.seat) { delete data.seatMap[user.seat]; user.seat = null; user.balance += 40; } // Refund 80%
+    if (user.cabin) { delete data.cabinMap[user.cabin]; user.cabin = null; }
+    saveData();
+    return message.reply("✅ Booking cancelled. (Seats partially refunded)");
+  }
+
+  // !map
   if (content === "!map seats") {
-    let out = "🛳️ RO-12 SEAT MAP\n\n";
+    let out = "🛳️ SEAT MAP\n";
     for (let r = 1; r <= 20; r++) {
       let row = `${String(r).padStart(2, "0")} `;
-      for (const l of ["A", "B", "C", "D", "E", "F"]) {
-        const seat = `${r}${l}`;
-        row += data.seatMap[seat] ? "[X]" : "[ ]";
-      }
+      for (const l of ["A", "B", "C", "D", "E", "F"]) row += data.seatMap[`${r}${l}`] ? "[X]" : "[ ]";
       out += row + "\n";
     }
     return message.reply(out);
   }
 
-  // ---------------- MAP CABINS ----------------
-  if (content.startsWith("!map cabins")) {
-    let out = "🛏️ CABINS\n\n";
-    for (const type in CABINS) {
-      out += `\n${type.toUpperCase()}\n`;
-      for (const cabin of CABINS[type]) {
-        out += `${cabin} ${data.cabinMap[cabin] ? "[X]" : "[ ]"}\n`;
-      }
-    }
-    return message.reply(out);
-  }
-
-  // ---------------- SET VOYAGE ----------------
+  // !setvoyage
   if (content.startsWith("!setvoyage")) {
     if (channel !== "staff") return;
-    const args = content.split(" ");
-    const from = args[1];
-    const to = args[2];
-    const length = args[3];
-
-    activeVoyage = {
-      id: voyageId++,
-      from,
-      to,
-      length,
-      captain: null,
-      fo: null,
-      gc: null,
-      gcDeadline: Date.now() + ONE_DAY,
-      departure: Date.now() + FIVE_DAYS,
-      salesOpen: false
-    };
-    return message.channel.send(`🚢 VOYAGE CREATED\n\n${from} → ${to}\nLength: ${length}\n\nCrew: Captain + First Officer (+ optional GC)`);
+    const [_, from, to, length] = content.split(" ");
+    activeVoyage = { id: voyageId++, from, to, length, captain: null, fo: null, gc: null, gcDeadline: Date.now() + ONE_DAY, salesOpen: false };
+    return message.channel.send(`🚢 VOYAGE CREATED: ${from} → ${to}`);
   }
 
-  // ---------------- CLAIMS ----------------
-  if (!activeVoyage) return;
-  if (content === "!claim captain") {
-    if (activeVoyage.captain) return message.reply("Taken");
-    activeVoyage.captain = message.author.username;
-    return message.reply("Captain claimed");
-  }
-  if (content === "!claim fo") {
-    if (activeVoyage.fo) return message.reply("Taken");
-    activeVoyage.fo = message.author.username;
-    return message.reply("First Officer claimed");
-  }
-  if (content === "!claim gc") {
-    if (activeVoyage.gc) return message.reply("Taken");
-    activeVoyage.gc = message.author.username;
-    return message.reply("Ground Crew claimed");
+  // !claim
+  if (content.startsWith("!claim")) {
+    if (!activeVoyage) return message.reply("❌ No active voyage.");
+    const role = content.split(" ")[1];
+    if (role === "captain" && !activeVoyage.captain) { activeVoyage.captain = message.author.username; return message.reply("Captain claimed."); }
+    if (role === "fo" && !activeVoyage.fo) { activeVoyage.fo = message.author.username; return message.reply("FO claimed."); }
+    if (role === "gc" && !activeVoyage.gc) { activeVoyage.gc = message.author.username; return message.reply("GC claimed."); }
   }
 });
 
-// ---------------- VOYAGE CHECKER ----------------
-setInterval(() => {
-  if (!activeVoyage) return;
-  const now = Date.now();
-  if (!activeVoyage.gc && now > activeVoyage.gcDeadline) activeVoyage.gc = "Unassigned";
-  if (activeVoyage.captain && activeVoyage.fo && !activeVoyage.salesOpen) {
+// VOYAGE CHECKER
+setInterval(async () => {
+  if (!activeVoyage || activeVoyage.salesOpen) return;
+  if (activeVoyage.captain && activeVoyage.fo) {
     activeVoyage.salesOpen = true;
-    const channel = client.channels.cache.find(c => c.name === "voyages");
-    if (channel) {
-      channel.send(`🚢 VOYAGE CONFIRMED\n\nRoute: ${activeVoyage.from} → ${activeVoyage.to}\nCaptain: ${activeVoyage.captain}\nFirst Officer: ${activeVoyage.fo}\nGround Crew: ${activeVoyage.gc || "None"}`);
-    }
+    const ch = client.channels.cache.find(c => c.name === "voyages");
+    if (ch) try { await ch.send("🚢 SALES NOW OPEN!"); } catch(e) { console.log(e); }
   }
 }, 60000);
 
-// ---------------- LOGIN ----------------
 client.login(TOKEN);
