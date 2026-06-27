@@ -49,6 +49,11 @@ function isValidSeat(seat) { return /^([1-9]|1[0-9]|20)([A-F])$/.test(seat); }
 client.once("ready", () => console.log(`Logged in as ${client.user.tag}`));
 
 // ---------------- COMMANDS ----------------
+// !checkvoyage (Debug command)
+  if (content === "!checkvoyage") {
+    if (!activeVoyage) return message.reply("No voyage active.");
+    return message.reply(`Voyage Status: Captain=${activeVoyage.captain}, FO=${activeVoyage.fo}, GC=${activeVoyage.gc}, SalesOpen=${activeVoyage.salesOpen}`);
+  }
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
