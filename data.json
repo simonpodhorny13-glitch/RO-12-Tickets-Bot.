@@ -1,5 +1,16 @@
 {
   "users": {},
-  "seatMap": {},
-  "cabinMap": {}
+  "voyages": {},
+  "claims": {},
+  "settings": {
+    "monthlyPayout": 250,
+    "dailyReward": 20,
+    "refundPercent": 90
+  }
+}
+"settings": {
+  "monthlyPayout": 250,
+  "dailyReward": 20,
+  "refundPercent": 90,
+  "nextVoyageId": 1
 }
