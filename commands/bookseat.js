@@ -2,49 +2,69 @@ const fs = require("fs");
 
 module.exports = {
   name: "bookseat",
+  description: "Book a seat for a voyage",
 
-  execute(message, args) {
-    const seat = args[0];
-    const filePath = "./data.json";
+  async execute(interaction) {
+    const seat = interaction.options.getString("seat");
+    const voyageId = interaction.options.getString("voyage");
 
-    if (!seat) {
-      return message.reply("❌ Usage: !bookseat 12C");
+    const data = JSON.parse(fs.readFileSync("./data.json", "utf8"));
+    const userId = interaction.user.id;
+
+    const voyage = data.voyages[voyageId];
+
+    if (!voyage) {
+      return interaction.reply({ content: "❌ Voyage not found.", ephemeral: true });
     }
 
-    const data = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    if (!voyage.salesOpen) {
+      return interaction.reply({ content: "❌ Sales are not open.", ephemeral: true });
+    }
 
-    const userId = message.author.id;
+    if (voyage.cancelled) {
+      return interaction.reply({ content: "❌ Voyage is cancelled.", ephemeral: true });
+    }
 
     if (!data.users[userId]) {
-      data.users[userId] = { balance: 0, spent: 0 };
+      data.users[userId] = { balance: 0, bookings: {} };
     }
 
-    if (data.users[userId].seat) {
-      return message.reply("❌ You already have a seat!");
+    const user = data.users[userId];
+    if (!user.bookings) user.bookings = {};
+
+    if (user.bookings[voyageId]) {
+      return interaction.reply({ content: "❌ You already booked for this voyage.", ephemeral: true });
     }
 
-    if (data.seatMap[seat]) {
-      return message.reply("❌ That seat is taken!");
+    if (voyage.seatMap[seat]) {
+      return interaction.reply({ content: "❌ Seat already taken.", ephemeral: true });
     }
 
-    const voyageType = data.voyage?.type || "short";
+    // 💰 pricing
     let price = 40;
 
-    if (voyageType === "medium") price *= 1.5;
-    if (voyageType === "long") price *= 2;
+    if (voyage.length === 2) price *= 1.5;
+    if (voyage.length === 3) price *= 2;
 
-    if (data.users[userId].balance < price) {
-      return message.reply("❌ Not enough balance!");
+    if (user.balance < price) {
+      return interaction.reply({ content: "❌ Not enough balance.", ephemeral: true });
     }
 
-    data.users[userId].balance -= price;
-    data.users[userId].spent += price;
+    user.balance -= price;
 
-    data.users[userId].seat = seat;
-    data.seatMap[seat] = userId;
+    user.bookings[voyageId] = {
+      type: "seat",
+      location: seat,
+      paid: price
+    };
 
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+    voyage.seatMap[seat] = userId;
 
-    message.reply(`💺 Seat ${seat} booked! 💰-${price}`);
+    fs.writeFileSync("./data.json", JSON.stringify(data, null, 2));
+
+    interaction.reply({
+      content: `💺 Seat ${seat} booked for ${voyageId}\n💰 Paid: $${price}`,
+      ephemeral: true
+    });
   }
 };
