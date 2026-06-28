@@ -12,7 +12,6 @@ module.exports = {
     }
 
     const data = JSON.parse(fs.readFileSync("./data.json", "utf8"));
-
     const voyage = data.voyages[voyageId];
 
     if (!voyage) {
@@ -20,11 +19,7 @@ module.exports = {
     }
 
     if (!voyage.crew) {
-      voyage.crew = {
-        captain: null,
-        fo: null,
-        gc: null
-      };
+      voyage.crew = { captain: null, fo: null, gc: null };
     }
 
     const userId = message.author.id;
@@ -43,21 +38,27 @@ module.exports = {
     const crew = voyage.crew;
 
     // =========================
-    // 🚢 CORE LOGIC
+    // 🚢 CAPTAIN + FO LOGIC
     // =========================
-
     if (crew.captain && crew.fo) {
 
-      // warn if GC missing
-      if (!crew.gc) {
+      // START GC TIMER ONLY ONCE
+      if (!crew.gc && !voyage.gcDeadline) {
+        voyage.gcDeadline = Date.now() + 24 * 60 * 60 * 1000;
+
         message.channel.send(
 `⏳ Ground Crew role unclaimed.
-Sales will begin within 24 hours if role is not claimed.`
+Sales will begin automatically within 24 hours if not claimed.`
         );
       }
 
-      // open sales if not already open
-      if (!voyage.salesOpen) {
+      // If GC exists, cancel timer
+      if (crew.gc && voyage.gcDeadline) {
+        delete voyage.gcDeadline;
+      }
+
+      // OPEN SALES IF GC ALREADY PRESENT
+      if (crew.gc && !voyage.salesOpen) {
         voyage.salesOpen = true;
 
         message.channel.send(
@@ -76,10 +77,7 @@ Ship
 ${voyage.ship}
 
 Departing
-${voyage.date}, ${voyage.time}
-
-Route Type
-${voyage.length === 1 ? "Short" : voyage.length === 2 ? "Medium" : "Long"}`
+${voyage.date}, ${voyage.time}`
         );
       }
     }
