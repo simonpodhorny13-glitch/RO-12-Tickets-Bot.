@@ -1,4 +1,5 @@
 const fs = require("fs");
+const { EmbedBuilder } = require("discord.js");
 
 module.exports = {
   name: "ticket",
@@ -30,42 +31,56 @@ module.exports = {
 
     const b = user.bookings[voyageId];
 
-    const status = voyage.cancelled
-      ? "❌ Cancelled"
-      : voyage.salesOpen
-      ? "🟢 Active"
-      : "🟡 Pending";
+    // 🚦 Status logic (expanded for realism)
+    let status = "🟡 Pending";
+    if (voyage.cancelled) status = "❌ Cancelled";
+    else if (voyage.inProgress) status = "🟣 In Progress";
+    else if (voyage.boarding) status = "🟠 Boarding";
+    else if (voyage.salesOpen) status = "🟢 Active";
 
     const typeLabel = b.type === "cabin" ? "🏨 Cabin" : "💺 Seat";
 
-    const message =
-`🎟️ YOUR TICKET
+    const embed = new EmbedBuilder()
+      .setColor(voyage.cancelled ? 0xff3b3b : 0x2ecc71)
+      .setTitle("🎟️ RO-12 BOARDING PASS")
+      .setDescription(`Voyage **${voyageId}**`)
+      .addFields(
+        {
+          name: "📍 Route",
+          value: `${voyage.from} → ${voyage.to}`,
+          inline: false
+        },
+        {
+          name: "🚢 Ship",
+          value: voyage.ship,
+          inline: true
+        },
+        {
+          name: "📅 Departure",
+          value: `${voyage.date}, ${voyage.time}`,
+          inline: true
+        },
+        {
+          name: "🚦 Status",
+          value: status,
+          inline: false
+        },
+        {
+          name: "🎫 Booking",
+          value: `${typeLabel}: ${b.location}`,
+          inline: true
+        },
+        {
+          name: "💰 Payment",
+          value: `$${b.paid}`,
+          inline: true
+        }
+      )
+      .setFooter({ text: "RO-12 Voyage System • Boarding Pass" })
+      .setTimestamp();
 
-Voyage ID
-${voyageId}
-
-From
-${voyage.from}
-
-To
-${voyage.to}
-
-Ship
-${voyage.ship}
-
-Departing
-${voyage.date}, ${voyage.time}
-
-Status
-${status}
-
-Booking
-${typeLabel}: ${b.location}
-
-💰 Paid: $${b.paid}`;
-
-    interaction.reply({
-      content: message,
+    return interaction.reply({
+      embeds: [embed],
       ephemeral: true
     });
   }
