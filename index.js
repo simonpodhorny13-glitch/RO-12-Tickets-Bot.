@@ -276,3 +276,50 @@ client.once("ready", () => {
 });
 
 client.login(TOKEN);
+
+const fs = require("fs");
+
+// =========================
+// 🚢 AUTO VOYAGE ENGINE
+// =========================
+setInterval(() => {
+  let data;
+
+  try {
+    data = JSON.parse(fs.readFileSync("./data.json", "utf8"));
+  } catch (err) {
+    console.log("❌ Failed to read data.json");
+    return;
+  }
+
+  let changed = false;
+
+  for (const id in data.voyages) {
+    const v = data.voyages[id];
+
+    if (!v || v.cancelled || v.salesOpen) continue;
+
+    const crew = v.crew || {};
+    const hasCaptainFO = crew.captain && crew.fo;
+
+    if (!hasCaptainFO) continue;
+
+    // =========================
+    // 🚢 GC TIMEOUT CHECK
+    // =========================
+    if (v.gcDeadline && Date.now() >= v.gcDeadline) {
+
+      v.salesOpen = true;
+      delete v.gcDeadline;
+
+      changed = true;
+
+      console.log(`🚢 AUTO SALES OPENED: ${id}`);
+    }
+  }
+
+  if (changed) {
+    fs.writeFileSync("./data.json", JSON.stringify(data, null, 2));
+  }
+
+}, 60 * 1000); // every 1 minute
