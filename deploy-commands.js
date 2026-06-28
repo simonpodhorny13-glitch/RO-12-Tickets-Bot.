@@ -13,8 +13,9 @@ const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
 
 (async () => {
   try {
-    console.log("Deploying slash commands...");
+    console.log(`Found ${commands.length} commands. Deploying...`);
 
+    // 🔥 IMPORTANT: Guild deploy (instant + safe for testing)
     await rest.put(
       Routes.applicationGuildCommands(
         process.env.CLIENT_ID,
@@ -23,8 +24,8 @@ const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
       { body: commands }
     );
 
-    console.log("Slash commands deployed successfully");
+    console.log("✅ Slash commands deployed successfully");
   } catch (error) {
-    console.error("Error deploying commands:", error);
+    console.error("❌ Deploy error:", error);
   }
 })();
