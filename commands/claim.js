@@ -11,8 +11,7 @@ module.exports = {
       return message.reply("❌ Usage: !claim <captain|fo|gc> <voyageId>");
     }
 
-    const filePath = "./data.json";
-    const data = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const data = JSON.parse(fs.readFileSync("./data.json", "utf8"));
 
     const voyage = data.voyages[voyageId];
 
@@ -30,12 +29,10 @@ module.exports = {
 
     const userId = message.author.id;
 
-    // validate role type
     if (!["captain", "fo", "gc"].includes(role)) {
       return message.reply("❌ Role must be captain, fo, or gc.");
     }
 
-    // check if already taken
     if (voyage.crew[role]) {
       return message.reply(`❌ ${role.toUpperCase()} already claimed.`);
     }
@@ -43,7 +40,51 @@ module.exports = {
     // assign role
     voyage.crew[role] = userId;
 
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+    const crew = voyage.crew;
+
+    // =========================
+    // 🚢 CORE LOGIC
+    // =========================
+
+    if (crew.captain && crew.fo) {
+
+      // warn if GC missing
+      if (!crew.gc) {
+        message.channel.send(
+`⏳ Ground Crew role unclaimed.
+Sales will begin within 24 hours if role is not claimed.`
+        );
+      }
+
+      // open sales if not already open
+      if (!voyage.salesOpen) {
+        voyage.salesOpen = true;
+
+        message.channel.send(
+`🚢 SALES NOW OPEN
+
+Voyage ID
+${voyageId}
+
+From
+${voyage.from}
+
+To
+${voyage.to}
+
+Ship
+${voyage.ship}
+
+Departing
+${voyage.date}, ${voyage.time}
+
+Route Type
+${voyage.length === 1 ? "Short" : voyage.length === 2 ? "Medium" : "Long"}`
+        );
+      }
+    }
+
+    fs.writeFileSync("./data.json", JSON.stringify(data, null, 2));
 
     message.reply(`✅ ${role.toUpperCase()} claimed for voyage ${voyageId}.`);
   }
