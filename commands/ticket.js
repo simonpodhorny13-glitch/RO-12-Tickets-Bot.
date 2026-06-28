@@ -75,6 +75,11 @@ module.exports = {
           value: `$${b.paid}`,
           inline: true
         }
+        {
+  name: "🧭 Passenger Info",
+  value: `Class: ${b.class || "Standard"}\nDeck: ${b.deck || "Main Deck"}`,
+  inline: true
+},
       )
       .setFooter({ text: "RO-12 Voyage System • Boarding Pass" })
       .setTimestamp();
