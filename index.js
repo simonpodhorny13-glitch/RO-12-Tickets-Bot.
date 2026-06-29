@@ -350,4 +350,6 @@ setInterval(async () => {
 /* ---------------- LOGIN ---------------- */
 console.log("TOKEN EXISTS:", !!process.env.TOKEN);
 
-client.login(TOKEN);
+client.login(TOKEN)
+  .then(() => console.log("✅ Logged in as", client.user.tag))
+  .catch(err => console.error("❌ Login failed:", err));
