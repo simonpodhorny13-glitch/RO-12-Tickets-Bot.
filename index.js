@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
 const fs = require("fs");
 const express = require("express");
+const VOYAGES_CHANNEL_ID = "1519404986079903854";
 
 /* ---------------- KEEP ALIVE ---------------- */
 
