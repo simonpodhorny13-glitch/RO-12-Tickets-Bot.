@@ -347,9 +347,12 @@ setInterval(async () => {
   if (changed) saveData();
 }, 60000);
 
-/* ---------------- LOGIN ---------------- */
-console.log("TOKEN EXISTS:", !!process.env.TOKEN);
+/* ---------------- LOGIN ---------------- */if (!process.env.TOKEN) {
+  console.log("❌ TOKEN missing");
+} else {
+  console.log("✅️ TOKEN EXISTS:", true);
 
-client.login(TOKEN)
-  .then(() => console.log("✅ Logged in as", client.user.tag))
-  .catch(err => console.error("❌ Login failed:", err));
+  client.login(process.env.TOKEN)
+    .then(() => console.log("✅️ Logged in as", client.user.tag))
+    .catch(err => console.error("❌ Login error:", err));
+}
