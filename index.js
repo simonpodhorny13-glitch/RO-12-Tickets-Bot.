@@ -319,39 +319,38 @@ setInterval(async () => {
     const crew = v.crew;
     if (!crew.captain || !crew.fo) continue;
 
-    // GC missing → start deadline
+    // Start GC timer
     if (!crew.gc && !v.gcDeadline) {
       v.gcDeadline = Date.now() + 24 * 60 * 60 * 1000;
-
       console.log(`⏳ GC deadline started for voyage ${id}`);
     }
 
-    // GC claimed before deadline → cancel timer
+    // Cancel timer if GC claimed
     if (crew.gc && v.gcDeadline) {
       delete v.gcDeadline;
     }
 
-    // AUTO SALES OPEN
-let channel;
+    // OPEN SALES ONLY WHEN TIMER EXPIRES
+    if (v.gcDeadline && Date.now() >= v.gcDeadline) {
+      v.salesOpen = true;
+      delete v.gcDeadline;
 
-try {
-  channel = await client.channels.fetch(VOYAGES_CHANNEL_ID);
-} catch (err) {
-  console.error("❌ Cannot fetch voyages channel:", err);
-}
+      try {
+        const channel = await client.channels.fetch(VOYAGES_CHANNEL_ID);
 
-if (channel) {
-  try {
-    await channel.send(
-      `🚢 **SALES OPENED**\n` +
-      `Voyage ${id}\n` +
-      `${v.from} → ${v.to}\n\n` +
-      `🧳 You can now book cabins and seats!`
-    );
-  } catch (err) {
-    console.error("❌ Cannot send message:", err);
-  }
-}
+        await channel.send(
+          `🚢 **SALES OPENED**\n` +
+          `Voyage ${id}\n` +
+          `${v.from} → ${v.to}\n\n` +
+          `🧳 You can now book cabins and seats!`
+        );
+      } catch (err) {
+        console.error("❌ Failed to send voyages message:", err);
+      }
+
+      console.log(`🚢 AUTO SALES OPENED: ${id}`);
+      changed = true;
+    }
   }
 
   if (changed) saveData();
