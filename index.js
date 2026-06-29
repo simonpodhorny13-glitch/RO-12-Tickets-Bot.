@@ -320,9 +320,8 @@ setInterval(() => {
 
     if (!crew.captain || !crew.fo) continue;
 
-    if (v.gcDeadline && Date.now() >= v.gcDeadline) {
-      v.salesOpen = true;
-      delete v.gcDeadline;
+    if (!crew.gc && !v.gcDeadline) {
+        v.gcDeadline = Date.now() + 24 * 60 * 60 * 1000;
 
       changed = true;
       console.log(`🚢 AUTO SALES OPENED: ${id}`);
