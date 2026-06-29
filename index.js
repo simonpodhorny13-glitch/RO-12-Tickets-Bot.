@@ -348,5 +348,6 @@ setInterval(async () => {
 }, 60000);
 
 /* ---------------- LOGIN ---------------- */
+console.log("TOKEN EXISTS:", !!process.env.TOKEN);
 
 client.login(TOKEN);
