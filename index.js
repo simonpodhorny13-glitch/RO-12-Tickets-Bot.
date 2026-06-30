@@ -74,7 +74,10 @@ function getUser(id) {
     data.users[id] = {
       balance: 250,
       seat: null,
-      cabin: null
+cabin: null,
+firstSeen: Date.now(),
+travelHistory: []
+      firstSeen: Date.now()   // 🪪 ADD THIS
     };
     saveData();
   }
@@ -270,6 +273,15 @@ client.on("messageCreate", async (message) => {
 
       user.balance -= price;
       v.cabinMap[target] = message.author.id;
+
+// 📜 LOG TRAVEL HISTORY
+getUser(message.author.id).travelHistory.push({
+  voyageId: v.id,
+  type: "cabin",
+  location: target,
+  date: Date.now()
+});
+saveData();
       user.cabin = target;
     } else {
       if (!isValidSeat(target) || v.seatMap[target])
@@ -277,6 +289,15 @@ client.on("messageCreate", async (message) => {
 
       user.balance -= price;
       v.seatMap[target] = message.author.id;
+
+// 📜 LOG TRAVEL HISTORY
+getUser(message.author.id).travelHistory.push({
+  voyageId: v.id,
+  type: "seat",
+  location: target,
+  date: Date.now()
+});
+saveData();
       user.seat = target;
     }
 
