@@ -27,25 +27,32 @@ module.exports = {
       });
     }
 
- // 🔍 find booking
-let bookingType = null;
-let bookingLocation = null;
+    // 🔍 find booking
+    let bookingType = null;
+    let bookingLocation = null;
 
-const cabin = Object.entries(voyage.cabinMap || {})
-  .find(([, id]) => id === userId);
+    const cabinEntry = Object.entries(voyage.cabinMap || {})
+      .find(([, id]) => id === userId);
 
-if (cabin) {
-  bookingType = "🛏️ Cabin";
-  bookingLocation = cabin[0];
-}
+    const seatEntry = Object.entries(voyage.seatMap || {})
+      .find(([, id]) => id === userId);
 
-const seat = Object.entries(voyage.seatMap || {})
-  .find(([, id]) => id === userId);
+    // 🚨 prevent dual booking
+    if (cabinEntry && seatEntry) {
+      return interaction.reply({
+        content: "❌ Dual booking detected. Please contact crew to fix your reservation.",
+        ephemeral: true
+      });
+    }
 
-if (seat) {
-  bookingType = "💺 Seat";
-  bookingLocation = seat[0];
-}
+    if (cabinEntry) {
+      bookingType = "🛏️ Cabin";
+      bookingLocation = cabinEntry[0];
+    } else if (seatEntry) {
+      bookingType = "💺 Seat";
+      bookingLocation = seatEntry[0];
+    }
+
     if (!bookingType) {
       return interaction.reply({
         content: "❌ You don't have a ticket for this voyage.",
