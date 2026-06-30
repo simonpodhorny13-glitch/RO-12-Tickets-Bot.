@@ -144,7 +144,6 @@ async function paySalaries() {
   }
 }
 
-/* run every 6 hours check */
 setInterval(paySalaries, 1000 * 60 * 60 * 6);
 
 /* ---------------- UTILS ---------------- */
@@ -211,6 +210,14 @@ client.on("messageCreate", async (message) => {
 
   if (content === "!balance") {
     return message.reply(`💰 Your balance: $${user.balance}`);
+  }
+
+  if (content === "!ping") {
+    const sent = await message.channel.send("🏓 Pong!");
+    const latency = sent.createdTimestamp - message.createdTimestamp;
+    const apiPing = Math.round(client.ws.ping);
+
+    return sent.edit(`🏓 Pong!\n⏱️ Latency: ${latency}ms\n📡 API: ${apiPing}ms`);
   }
 
   if (content === "!map cabins") {
