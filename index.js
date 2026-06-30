@@ -5,6 +5,21 @@ const express = require("express");
 
 const VOYAGES_CHANNEL_ID = "1519404986079903854";
 
+/* ---------------- ROLE SALARIES ---------------- */
+
+const ROLE_SALARIES = {
+  groundCrew: "1520435967264292944",
+  firstOfficer: "1519410229744504963",
+  captain: "1519409864185614467",
+  admin: "1519406529495961873",
+  owner: "1519408960803700948",
+  passenger: "1519410590458576907",
+  trainee: "1521132303454048296",
+  gcTrainee: "1521133652963098717"
+};
+
+const SALARY_INTERVAL = 1000 * 60 * 60 * 24 * 30; // 30 days
+
 /* ---------------- KEEP ALIVE ---------------- */
 
 const app = express();
@@ -36,7 +51,8 @@ function loadData() {
       return {
         users: {},
         voyages: {},
-        voyageIdCounter: 1
+        voyageIdCounter: 1,
+        lastSalaryRun: 0
       };
     }
     return JSON.parse(fs.readFileSync("data.json", "utf8"));
@@ -44,7 +60,8 @@ function loadData() {
     return {
       users: {},
       voyages: {},
-      voyageIdCounter: 1
+      voyageIdCounter: 1,
+      lastSalaryRun: 0
     };
   }
 }
@@ -57,12 +74,15 @@ let voyageIdCounter = data.voyageIdCounter || 1;
 data.voyages = voyages;
 data.voyageIdCounter = voyageIdCounter;
 
+data.lastSalaryRun = data.lastSalaryRun || 0;
+
 /* ---------------- SAVE ---------------- */
 
 function saveData() {
   data.users = data.users || {};
   data.voyages = voyages;
   data.voyageIdCounter = voyageIdCounter;
+  data.lastSalaryRun = data.lastSalaryRun || 0;
 
   fs.writeFileSync("data.json", JSON.stringify(data, null, 2));
 }
@@ -74,15 +94,58 @@ function getUser(id) {
     data.users[id] = {
       balance: 250,
       seat: null,
-cabin: null,
-firstSeen: Date.now(),
-travelHistory: []
-      firstSeen: Date.now()   // 🪪 ADD THIS
+      cabin: null,
+      firstSeen: Date.now(),
+      travelHistory: []
     };
     saveData();
   }
   return data.users[id];
 }
+
+/* ---------------- SALARY SYSTEM ---------------- */
+
+async function paySalaries() {
+  try {
+    const now = Date.now();
+
+    if (now - (data.lastSalaryRun || 0) < SALARY_INTERVAL) return;
+
+    const guild = client.guilds.cache.first();
+    if (!guild) return;
+
+    await guild.members.fetch();
+
+    for (const userId in data.users) {
+      const member = guild.members.cache.get(userId);
+      if (!member) continue;
+
+      let salary = 250;
+
+      if (member.roles.cache.has(ROLE_SALARIES.owner)) salary = 5000;
+      else if (member.roles.cache.has(ROLE_SALARIES.admin)) salary = 1000;
+      else if (member.roles.cache.has(ROLE_SALARIES.captain)) salary = 800;
+      else if (member.roles.cache.has(ROLE_SALARIES.firstOfficer)) salary = 450;
+      else if (member.roles.cache.has(ROLE_SALARIES.groundCrew)) salary = 300;
+      else if (
+        member.roles.cache.has(ROLE_SALARIES.trainee) ||
+        member.roles.cache.has(ROLE_SALARIES.gcTrainee)
+      ) salary = 275;
+
+      data.users[userId].balance = (data.users[userId].balance || 0) + salary;
+    }
+
+    data.lastSalaryRun = now;
+    saveData();
+
+    console.log("💰 Monthly salaries paid");
+  } catch (err) {
+    console.error("Salary system error:", err);
+  }
+}
+
+/* run every 6 hours check */
+setInterval(paySalaries, 1000 * 60 * 60 * 6);
 
 /* ---------------- UTILS ---------------- */
 
@@ -146,12 +209,10 @@ client.on("messageCreate", async (message) => {
   const content = message.content;
   const user = getUser(message.author.id);
 
-  /* ---------------- BALANCE ---------------- */
   if (content === "!balance") {
     return message.reply(`💰 Your balance: $${user.balance}`);
   }
 
-  /* ---------------- MAP ---------------- */
   if (content === "!map cabins") {
     const isTaken = (id) => {
       return Object.values(voyages).some(v => v.cabinMap?.[id]);
@@ -165,7 +226,6 @@ client.on("messageCreate", async (message) => {
     );
   }
 
-  /* ---------------- SET VOYAGE ---------------- */
   if (content.startsWith("!setvoyage")) {
     const channel = message.channel.name;
     if (channel !== "staff") return;
@@ -201,7 +261,6 @@ client.on("messageCreate", async (message) => {
     return message.channel.send(`🚢 VOYAGE CREATED\nID: ${id}\n${from} → ${to}`);
   }
 
-  /* ---------------- CLAIM ---------------- */
   if (content.startsWith("!claim")) {
     const parts = content.split(" ");
     const role = parts[1];
@@ -212,27 +271,17 @@ client.on("messageCreate", async (message) => {
 
     const roles = message.member?.roles.cache;
 
-    if (!["captain", "fo", "gc"].includes(role))
-      return message.reply("❌ Invalid role.");
-
     if (!v.crew) v.crew = { captain: null, fo: null, gc: null };
 
-    if (v.crew[role])
-      return message.reply("❌ Already claimed.");
+    if (v.crew[role]) return message.reply("❌ Already claimed.");
 
     const hasRole = (name) => roles.some(r => r.name === name);
 
-    if (role === "captain" && !hasRole("Captain"))
-      return message.reply("❌ Not Captain.");
-
-    if (role === "fo" && !hasRole("First Officer"))
-      return message.reply("❌ Not FO.");
-
-    if (role === "gc" && !hasRole("Ground Crew"))
-      return message.reply("❌ Not GC.");
+    if (role === "captain" && !hasRole("Captain")) return message.reply("❌ Not Captain.");
+    if (role === "fo" && !hasRole("First Officer")) return message.reply("❌ Not FO.");
+    if (role === "gc" && !hasRole("Ground Crew")) return message.reply("❌ Not GC.");
 
     v.crew[role] = message.author.id;
-
     saveData();
 
     const crew = v.crew;
@@ -255,7 +304,6 @@ client.on("messageCreate", async (message) => {
     return message.reply(`✅ ${role} claimed.`);
   }
 
-  /* ---------------- BOOKING ---------------- */
   if (content.startsWith("!bookcabin") || content.startsWith("!seat")) {
     const isCabin = content.startsWith("!bookcabin");
     const target = content.split(" ")[1];
@@ -274,14 +322,14 @@ client.on("messageCreate", async (message) => {
       user.balance -= price;
       v.cabinMap[target] = message.author.id;
 
-// 📜 LOG TRAVEL HISTORY
-getUser(message.author.id).travelHistory.push({
-  voyageId: v.id,
-  type: "cabin",
-  location: target,
-  date: Date.now()
-});
-saveData();
+      getUser(message.author.id).travelHistory.push({
+        voyageId: v.id,
+        type: "cabin",
+        location: target,
+        date: Date.now()
+      });
+
+      saveData();
       user.cabin = target;
     } else {
       if (!isValidSeat(target) || v.seatMap[target])
@@ -290,14 +338,14 @@ saveData();
       user.balance -= price;
       v.seatMap[target] = message.author.id;
 
-// 📜 LOG TRAVEL HISTORY
-getUser(message.author.id).travelHistory.push({
-  voyageId: v.id,
-  type: "seat",
-  location: target,
-  date: Date.now()
-});
-saveData();
+      getUser(message.author.id).travelHistory.push({
+        voyageId: v.id,
+        type: "seat",
+        location: target,
+        date: Date.now()
+      });
+
+      saveData();
       user.seat = target;
     }
 
@@ -305,7 +353,6 @@ saveData();
     return message.reply(`✅ Booked ${target}`);
   }
 
-  /* ---------------- CANCEL ---------------- */
   if (content === "!cancel") {
     let refund = 0;
 
@@ -330,8 +377,6 @@ saveData();
     return message.reply(`💸 Refund: $${Math.floor(refund)}`);
   }
 });
-
-/* ---------------- AUTO ENGINE ---------------- */
 
 setInterval(async () => {
   let changed = false;
@@ -368,7 +413,7 @@ setInterval(async () => {
   if (changed) saveData();
 }, 60000);
 
-/* ---------------- LOGIN ---------------- */if (!process.env.TOKEN) {
+if (!process.env.TOKEN) {
   console.log("❌ TOKEN missing");
 } else {
   console.log("✅️ TOKEN EXISTS:", true);
