@@ -27,22 +27,25 @@ module.exports = {
       });
     }
 
-    // 🔍 find booking
-    let bookingType = null;
-    let bookingLocation = null;
+ // 🔍 find booking
+let bookingType = null;
+let bookingLocation = null;
 
-    if (voyage.cabinMap?.[userId]) {
-      bookingType = "🛏️ Cabin";
-      bookingLocation = Object.keys(voyage.cabinMap)
-        .find(k => voyage.cabinMap[k] === userId);
-    }
+const cabin = Object.entries(voyage.cabinMap || {})
+  .find(([, id]) => id === userId);
 
-    if (voyage.seatMap?.[userId]) {
-      bookingType = "💺 Seat";
-      bookingLocation = Object.keys(voyage.seatMap)
-        .find(k => voyage.seatMap[k] === userId);
-    }
+if (cabin) {
+  bookingType = "🛏️ Cabin";
+  bookingLocation = cabin[0];
+}
 
+const seat = Object.entries(voyage.seatMap || {})
+  .find(([, id]) => id === userId);
+
+if (seat) {
+  bookingType = "💺 Seat";
+  bookingLocation = seat[0];
+}
     if (!bookingType) {
       return interaction.reply({
         content: "❌ You don't have a ticket for this voyage.",
